@@ -222,6 +222,7 @@ program main
                 //"output_file='density';" &
                 //"data_column=1;" &
                 //"x_label='Layer';" &
+                //"y_label='Carrier Density [nm^{-2}]';" &
                 //"x_offset=1;" &
                 //"path='"//trim(variation_path)//"'" &
                 //""" basic_plot.p")
@@ -230,6 +231,7 @@ program main
                 //"output_file='potential';" &
                 //"data_column=1;" &
                 //"x_label='Layer';" &
+                //"y_label='Carrier Density [nm^{-2}]';" &
                 //"x_offset=1;" &
                 //"path='"//trim(variation_path)//"'" &
                 //""" basic_plot.p")
@@ -239,6 +241,7 @@ program main
                     //"output_file='Total_Density';" &
                     //"data_column=1;" &
                     //"x_label='"//x_label//"';" &
+                    //"y_label='Carrier Density [nm^{-2}]';" &
                     //"x_offset=1;" &
                     //"path='"//trim(path)//"'" &
                     //""" basic_plot.p")
@@ -247,6 +250,7 @@ program main
                     //"output_file='reservoir_density';" &
                     //"data_column=2;" &
                     //"x_label='"//x_label//"';" &
+                    //"y_label='Carrier Density [nm^{-2}]';" &
                     //"x_offset=1;" &
                     //"path='"//trim(path)//"'" &
                     //""" basic_plot.p")
@@ -255,6 +259,7 @@ program main
                     //"output_file='transport_density';" &
                     //"data_column=3;" &
                     //"x_label='"//x_label//"';" &
+                    //"y_label='Carrier Density [nm^{-2}]';" &
                     //"x_offset=1;" &
                     //"path='"//trim(path)//"'" &
                     //""" basic_plot.p")
@@ -263,6 +268,7 @@ program main
                     //"output_file='reservoir_plus_transport_density';" &
                     //"data_column=4;" &
                     //"x_label='"//x_label//"';" &
+                    //"y_label='Carrier Density [nm^{-2}]';" &
                     //"x_offset=1;" &
                     //"path='"//trim(path)//"'" &
                     //""" basic_plot.p")

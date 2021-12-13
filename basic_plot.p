@@ -8,6 +8,6 @@ set tics scale 0;
 
 set xlabel x_label;
 
-set ylabel "Carrier Density [nm^{-2}]";
+set ylabel y_label;
 
 plot data_file.".dat" using (column(0) + x_offset):data_column with lines linewidth 2 linecolor rgbcolor 'blue';
