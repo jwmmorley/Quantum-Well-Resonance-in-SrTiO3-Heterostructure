@@ -12,34 +12,36 @@ program main
     use export
     implicit none
     
-    integer,        parameter   :: num_variation      = 40
-    integer,        parameter   :: num_layers         = 125
+    integer,        parameter   :: num_variation      = 20
+    integer,        parameter   :: num_layers         = 200
     
-    integer                     :: well_1_start       = 30
+    integer                     :: well_1_start       = 20
     integer                     :: well_1_stop        = 50
     real*8                      :: well_1_start_depth = -0.18d0
     real*8                      :: well_1_stop_depth  = -0.18d0
     
-    integer                     :: well_2_start       = 50
-    integer                     :: well_2_stop        = 55
+    integer                     :: well_2_start       = 54
+    integer                     :: well_2_stop        = 53
     real*8                      :: well_2_start_depth = -0.03d0 
     real*8                      :: well_2_stop_depth  = -0.03d0
     
-    integer,        parameter   :: num_k_length       = 50
-    integer,        parameter   :: num_energy         = 50
-    real*8,         parameter   :: energy_min         = -0.375d0
+    integer,        parameter   :: num_k_length       = 25 !80
+    integer,        parameter   :: num_energy         = 80
+    real*8,         parameter   :: energy_min         = -0.3d0
     real*8,         parameter   :: energy_max         = 0d0
     real*8,         parameter   :: length_scale       = 0.25d0
     real*8,         parameter   :: broadening         = 0.005d0
     real*8,         parameter   :: zheevr_tolerance   = 0.1d0
     
-    character(256), parameter   :: input_file         = "SrTiO3_hr.dat"
-    character(256), parameter   :: out_dir            = "./out/"
-    character(256), parameter   :: all_denity_file    = "all_density.dat"
-    character(256), parameter   :: meta_file          = "meta.dat"
-    character(256), parameter   :: heatmap_file       = "heatmap.dat"
-    character(256), parameter   :: potential_file     = "potential.dat"
-    character(256), parameter   :: density_file       = "density.dat"
+    character(*), parameter   :: x_label            = "Transport Width"
+    
+    character(*), parameter   :: input_file         = "SrTiO3_hr.dat"
+    character(*), parameter   :: out_dir            = "./out/"
+    character(*), parameter   :: all_denity_file    = "all_density"
+    character(*), parameter   :: meta_file          = "meta"
+    character(*), parameter   :: heatmap_file       = "heatmap"
+    character(*), parameter   :: potential_file     = "potential"
+    character(*), parameter   :: density_file       = "density"
     real*8,         parameter   :: crystal_length     = 3.905d-10
     real*8,         parameter   :: pi                 = 3.141592653589793d0
     
@@ -91,7 +93,7 @@ program main
     call cpu_start()
     if (cpu_is_master()) then
         call timer_start()
-        print *, "Innit..."
+        print *, "Initilise..."
     end if
     
     ! Extract Data
@@ -132,8 +134,8 @@ program main
     ! Set up Output Folder
     if (cpu_is_master()) then
         path = export_create_dir(out_dir)
-        call export_data(trim(path)//trim(all_denity_file), &
-            "#          Total  Quantum Well 1  Quantum Well 2")
+        call export_data(trim(path)//trim(all_denity_file)//".dat", &
+            "#          Total  Quantum Well 1  Quantum Well 2 Quantum Well Sum")
     end if
     
     ! Analyse
@@ -147,7 +149,6 @@ program main
         spec       = 0d0
         
         ! Manipulate Wells
-        well_2_start = well_2_start + 1
         well_2_stop  = well_2_stop + 1
         
         ! Set Up Potential
@@ -200,30 +201,71 @@ program main
             
             ! Export Data
             variation_path = export_create_dir(path)
-            call export_meta_data(trim(variation_path)//trim(meta_file), &
+            call export_meta_data(trim(variation_path)//trim(meta_file)//".dat", &
                 num_k_length, num_layers, broadening, crystal_length, length_scale, &
                 minval(pot), maxval(pot), minval(den), maxval(den), energy_min, energy_max, minval(heatmap), maxval(heatmap))
-            call export_data(trim(variation_path)//trim(heatmap_file), transpose(heatmap))
-            call export_data(trim(variation_path)//trim(potential_file), pot)
-            call export_data(trim(variation_path)//trim(density_file), den)
-            call export_data(trim(path)//trim(all_denity_file), reshape( &
-                (/ sum(den), sum(den(well_1_start:well_1_stop)), sum(den(well_2_start:well_2_stop)) /), (/ 1, 3 /)))
+            call export_data(trim(variation_path)//trim(heatmap_file)//".dat", transpose(heatmap))
+            call export_data(trim(variation_path)//trim(potential_file)//".dat", pot)
+            call export_data(trim(variation_path)//trim(density_file)//".dat", den)
+            call export_data(trim(path)//trim(all_denity_file)//".dat", reshape((/ &
+                sum(den) / size(den), &
+                sum(den(well_1_start:well_1_stop)) / (abs(well_1_stop - well_1_start) + 1), &
+                sum(den(well_2_start:well_2_stop)) / (abs(well_2_stop - well_2_start) + 1), &
+                sum(den(well_1_start:well_1_stop)) / (abs(well_1_stop - well_1_start) + 1) + &
+                    sum(den(well_2_start:well_2_stop)) / (abs(well_2_stop - well_2_start) + 1) &
+                /), (/ 1, 4 /)))
             
             ! Produce Graphs
             call execute_command_line("gnuplot -c heatmap.p "//trim(variation_path))
-            call execute_command_line("gnuplot -c density.p "//trim(variation_path))
-            if (any(pot /= 0d0)) then
-                call execute_command_line("gnuplot -c potential.p "//trim(variation_path))
-            end if
+            call execute_command_line("gnuplot -e """ &
+                //"data_file='"//density_file//"';" &
+                //"output_file='density';" &
+                //"data_column=1;" &
+                //"x_label='Layer';" &
+                //"x_offset=1;" &
+                //"path='"//trim(variation_path)//"'" &
+                //""" basic_plot.p")
+            call execute_command_line("gnuplot -e """ &
+                //"data_file='"//potential_file//"';" &
+                //"output_file='potential';" &
+                //"data_column=1;" &
+                //"x_label='Layer';" &
+                //"x_offset=1;" &
+                //"path='"//trim(variation_path)//"'" &
+                //""" basic_plot.p")
             if (i > 2) then
-                call execute_command_line("gnuplot -c total_density.p "//trim(path)// &
-                    " Seperation[a] "//export_to_string(well_2_start - well_1_stop - i + 1))
-                call execute_command_line("gnuplot -c reservoir_density.p "//trim(path)// &
-                    " Seperation[a] "//export_to_string(well_2_start - well_1_stop - i + 1))
-                call execute_command_line("gnuplot -c transport_density.p "//trim(path)// &
-                    " Seperation[a] "//export_to_string(well_2_start - well_1_stop - i + 1))
-                call execute_command_line("gnuplot -c reservoir_plus_transport_density.p "//trim(path)// &
-                    " Seperation[a] "//export_to_string(well_2_start - well_1_stop - i + 1))
+                call execute_command_line("gnuplot -e """ &
+                    //"data_file='"//all_denity_file//"';" &
+                    //"output_file='Total_Density';" &
+                    //"data_column=1;" &
+                    //"x_label='"//x_label//"';" &
+                    //"x_offset=1;" &
+                    //"path='"//trim(path)//"'" &
+                    //""" basic_plot.p")
+                call execute_command_line("gnuplot -e """ &
+                    //"data_file='"//all_denity_file//"';" &
+                    //"output_file='reservoir_density';" &
+                    //"data_column=2;" &
+                    //"x_label='"//x_label//"';" &
+                    //"x_offset=1;" &
+                    //"path='"//trim(path)//"'" &
+                    //""" basic_plot.p")
+                call execute_command_line("gnuplot -e """ &
+                    //"data_file='"//all_denity_file//"';" &
+                    //"output_file='transport_density';" &
+                    //"data_column=3;" &
+                    //"x_label='"//x_label//"';" &
+                    //"x_offset=1;" &
+                    //"path='"//trim(path)//"'" &
+                    //""" basic_plot.p")
+                call execute_command_line("gnuplot -e """ &
+                    //"data_file='"//all_denity_file//"';" &
+                    //"output_file='reservoir_plus_transport_density';" &
+                    //"data_column=4;" &
+                    //"x_label='"//x_label//"';" &
+                    //"x_offset=1;" &
+                    //"path='"//trim(path)//"'" &
+                    //""" basic_plot.p")
             end if
             
             write(*, fmt = "(A10, I4.1, A9)") "Variation ", i, " complete"
