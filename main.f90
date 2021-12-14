@@ -12,36 +12,37 @@ program main
     use export
     implicit none
     
-    integer,        parameter   :: num_variation      = 20
+    integer,        parameter   :: num_variation      = 25
     integer,        parameter   :: num_layers         = 200
     
-    integer                     :: well_1_start       = 20
-    integer                     :: well_1_stop        = 50
-    real*8                      :: well_1_start_depth = -0.18d0
-    real*8                      :: well_1_stop_depth  = -0.18d0
+    integer                     :: well_1_start       = 30
+    integer                     :: well_1_stop        = 66
+    real*8                      :: well_1_start_depth = -0.22d0
+    real*8                      :: well_1_stop_depth  = -0.22d0
     
-    integer                     :: well_2_start       = 54
-    integer                     :: well_2_stop        = 53
+    integer                     :: well_2_start       = 66
+    integer                     :: well_2_stop        = 66 + 4
     real*8                      :: well_2_start_depth = -0.03d0 
     real*8                      :: well_2_stop_depth  = -0.03d0
     
-    integer,        parameter   :: num_k_length       = 25 !80
+    integer,        parameter   :: num_k_length       = 80
     integer,        parameter   :: num_energy         = 80
     real*8,         parameter   :: energy_min         = -0.3d0
     real*8,         parameter   :: energy_max         = 0d0
-    real*8,         parameter   :: length_scale       = 0.25d0
-    real*8,         parameter   :: broadening         = 0.005d0
+    real*8,         parameter   :: length_scale       = 0.5d0
+    real*8,         parameter   :: broadening         = 0.0025d0
     real*8,         parameter   :: zheevr_tolerance   = 0.1d0
     
-    character(*), parameter   :: x_label            = "Transport Width"
+    integer                     :: x_offset           = 0
+    character(*),   parameter   :: x_label            = "Reservoir and Transport Seperation"
     
-    character(*), parameter   :: input_file         = "SrTiO3_hr.dat"
-    character(*), parameter   :: out_dir            = "./out/"
-    character(*), parameter   :: all_denity_file    = "all_density"
-    character(*), parameter   :: meta_file          = "meta"
-    character(*), parameter   :: heatmap_file       = "heatmap"
-    character(*), parameter   :: potential_file     = "potential"
-    character(*), parameter   :: density_file       = "density"
+    character(*),   parameter   :: input_file         = "SrTiO3_hr.dat"
+    character(*),   parameter   :: out_dir            = "./out/"
+    character(*),   parameter   :: all_denity_file    = "all_density"
+    character(*),   parameter   :: meta_file          = "meta"
+    character(*),   parameter   :: heatmap_file       = "heatmap"
+    character(*),   parameter   :: potential_file     = "potential"
+    character(*),   parameter   :: density_file       = "density"
     real*8,         parameter   :: crystal_length     = 3.905d-10
     real*8,         parameter   :: pi                 = 3.141592653589793d0
     
@@ -70,10 +71,10 @@ program main
     
     complex*16,     allocatable :: hb(:, :)
     
-    real*8,         allocatable :: spec_slice(:, :, :)
-    real*8,         allocatable :: spec(:, :, :)
+    real*8,         allocatable :: spec_slice(:, :, :, :)
+    real*8,         allocatable :: spec(:, :, :, :)
     
-    real*8,         allocatable :: energy(:), weight(:, :)
+    real*8,         allocatable :: energy(:), weight(:, :, :)
     complex*16,     allocatable :: eigen_vec(:, :)
     integer                     :: num_found
     
@@ -81,14 +82,14 @@ program main
     
     real*8                      :: energy_range(num_energy)
     
-    real*8,         allocatable :: heatmap(:, :)
-    real*8                      :: den(num_layers)
+    real*8,         allocatable :: heatmap(:, :, :)
+    real*8,         allocatable :: den(:, :)
     
     character(256)              :: path, variation_path
     
     real*8                      :: output_density
     
-    integer                     :: i, j, k, l, m
+    integer                     :: i, j, k, l, m, e
 
     call cpu_start()
     if (cpu_is_master()) then
@@ -118,10 +119,11 @@ program main
     ! Allocate Dynamic Arrays
     allocate(energy(num_layers * num_bands))
     allocate(eigen_vec(num_layers * num_bands, num_layers * num_bands))
-    allocate(weight(num_layers, num_layers * num_bands))
-    allocate(spec_slice(size(kw), num_layers, num_energy))
-    allocate(spec(size(kw), num_layers, num_energy))
-    allocate(heatmap(size(kp), num_energy))
+    allocate(weight(num_layers, num_bands, num_layers * num_bands))
+    allocate(spec_slice(size(kw), num_layers, num_bands, num_energy))
+    allocate(spec(size(kw), num_layers, num_bands, num_energy))
+    allocate(heatmap(size(kp), num_bands, num_energy))
+    allocate(den(num_layers, num_bands))
     
     ! Determine Conductiong Band Minimum
     hb = bulk_build(transform_r_to_kz(hr, hrw, 0d0, 0d0), num_layers)
@@ -135,7 +137,8 @@ program main
     if (cpu_is_master()) then
         path = export_create_dir(out_dir)
         call export_data(trim(path)//trim(all_denity_file)//".dat", &
-            "#          Total  Quantum Well 1  Quantum Well 2 Quantum Well Sum")
+            "#          Total  Quantum Well 1  Quantum Well 2             Sum"// &
+            "       Avg Total      Avg Well 1      Avg Well 2    Avg Well Sum")
     end if
     
     ! Analyse
@@ -149,7 +152,8 @@ program main
         spec       = 0d0
         
         ! Manipulate Wells
-        well_2_stop  = well_2_stop + 1
+        well_2_start = well_2_start + 1
+        well_2_stop  = well_2_start + 2
         
         ! Set Up Potential
         call potential_add_well(pot, well_1_start, well_1_stop, well_1_start_depth, well_1_stop_depth)
@@ -165,16 +169,18 @@ program main
             energy = energy - cbm
             weight = 0d0
             do l = 1, num_layers
-                do j = 1, num_found
-                    do m = 1, num_bands
-                        weight(l, j) = weight(l, j) + abs(eigen_vec((l - 1) * num_bands + m, j))**2
+                do j = 1, num_bands
+                    do m = 1, num_found
+                        weight(l, j, m) = weight(l, j, m) + abs(eigen_vec((l - 1) * num_bands + j, m))**2
                     end do
                 end do
             end do
             do l = 1, num_layers
-                do j = 1, num_energy
-                    spec_slice(k, l, j) = spectral_function(energy(:num_found), dble(weight(l, :num_found)), &
-                        energy_range(j), broadening)
+                do j = 1, num_bands
+                    do e = 1, num_energy
+                        spec_slice(k, l, j, e) = spectral_function(energy(:num_found), dble(weight(l, j, :num_found)), &
+                            energy_range(e), broadening)
+                    end do
                 end do
             end do
         end do
@@ -182,41 +188,76 @@ program main
         
         ! No more multithreading for rest of cycle
         if (cpu_is_master()) then
-            ! Determine Heatmap
-            do k = 1, size(kp)
-                do j = 1, num_energy
-                    heatmap(k, j) = sum(spec(kp(k), :, j))
-                end do
-            end do
-            where (heatmap == 0d0)
-                heatmap = minval(heatmap, mask = heatmap /= 0d0)
-            end where
-            heatmap = log(heatmap)
-            
             ! Determine Density
             do l = 1, num_layers
-                den(l) = density_function(spec(:, l, :), kw, crystal_length, energy_min, energy_max, num_energy)
+                do j = 1, num_bands
+                    den(l, j) = density_function(spec(:, l, j, :), kw, crystal_length, energy_min, energy_max, num_energy)
+                end do
             end do
             den = den * 1d-18
             
-            ! Export Data
+            ! Determine Heatmap
+            do k = 1, size(kp)
+                do j = 1, num_bands
+                    do e = 1, num_energy
+                        heatmap(k, j, e) = sum(spec(kp(k), :, j, e))
+                    end do
+                end do
+            end do
+            do j = 1, num_bands
+                where (heatmap(:, j, :) == 0d0)
+                    heatmap(:, j, :) = minval(heatmap(:, j, :), mask = heatmap(:, j, :) /= 0d0)
+                end where
+            end do
+            
+            ! Export Meta Data
             variation_path = export_create_dir(path)
             call export_meta_data(trim(variation_path)//trim(meta_file)//".dat", &
                 num_k_length, num_layers, broadening, crystal_length, length_scale, &
-                minval(pot), maxval(pot), minval(den), maxval(den), energy_min, energy_max, minval(heatmap), maxval(heatmap))
-            call export_data(trim(variation_path)//trim(heatmap_file)//".dat", transpose(heatmap))
+                minval(pot), maxval(pot), minval(den), maxval(den), &
+                energy_min, energy_max, minval(log(heatmap)), maxval(log(heatmap)))
+                
+            ! Export Density Data
             call export_data(trim(variation_path)//trim(potential_file)//".dat", pot)
-            call export_data(trim(variation_path)//trim(density_file)//".dat", den)
+            call export_data(trim(variation_path)//trim(density_file)//".dat", sum(den, 2))
+            do j = 1, num_bands
+                call export_data(trim(variation_path)//export_to_string(j)//trim(density_file)//".dat", &
+                    den(:, j))
+            end do
             call export_data(trim(path)//trim(all_denity_file)//".dat", reshape((/ &
+                sum(den), &
+                sum(den(well_1_start:well_1_stop, :)), &
+                sum(den(well_2_start:well_2_stop, :)), &
+                sum(den(well_1_start:well_1_stop, :)) + &
+                    sum(den(well_2_start:well_2_stop, :)), &
                 sum(den) / size(den), &
-                sum(den(well_1_start:well_1_stop)) / (abs(well_1_stop - well_1_start) + 1), &
-                sum(den(well_2_start:well_2_stop)) / (abs(well_2_stop - well_2_start) + 1), &
-                sum(den(well_1_start:well_1_stop)) / (abs(well_1_stop - well_1_start) + 1) + &
-                    sum(den(well_2_start:well_2_stop)) / (abs(well_2_stop - well_2_start) + 1) &
-                /), (/ 1, 4 /)))
+                sum(den(well_1_start:well_1_stop, :)) / (abs(well_1_stop - well_1_start) + 1), &
+                sum(den(well_2_start:well_2_stop, :)) / (abs(well_2_stop - well_2_start) + 1), &
+                sum(den(well_1_start:well_1_stop, :)) + &
+                    sum(den(well_2_start:well_2_stop, :)) / (abs(well_1_stop + well_2_stop - well_1_start - well_2_start) + 2) &
+                /), (/ 1, 8 /)))
+                
+            ! Export Heatmap Data
+            call export_data(trim(variation_path)//trim(heatmap_file)//".dat", &
+                    transpose(log(sum(heatmap(:, :, :), 2))))
+            do j = 1, num_bands
+                call export_data(trim(variation_path)//export_to_string(j)//trim(heatmap_file)//".dat", &
+                    transpose(log(heatmap(:, j, :))))
+            end do
             
             ! Produce Graphs
-            call execute_command_line("gnuplot -c heatmap.p "//trim(variation_path))
+            call execute_command_line("gnuplot -e """ &
+                    //"data_file='"//heatmap_file//"';" &
+                    //"output_file='"//heatmap_file//"';" &
+                    //"path='"//trim(variation_path)//"'" &
+                    //""" basic_heatmap.p")
+            do j = 1, num_bands
+                call execute_command_line("gnuplot -e """ &
+                    //"data_file='"//export_to_string(j)//heatmap_file//"';" &
+                    //"output_file='"//export_to_string(j)//heatmap_file//"';" &
+                    //"path='"//trim(variation_path)//"'" &
+                    //""" basic_heatmap.p")
+            end do
             call execute_command_line("gnuplot -e """ &
                 //"data_file='"//density_file//"';" &
                 //"output_file='density';" &
@@ -226,12 +267,23 @@ program main
                 //"x_offset=1;" &
                 //"path='"//trim(variation_path)//"'" &
                 //""" basic_plot.p")
+            do j = 1, num_bands
+                call execute_command_line("gnuplot -e """ &
+                    //"data_file='"//export_to_string(j)//density_file//"';" &
+                    //"output_file='"//export_to_string(j)//density_file//"';" &
+                    //"data_column=1;" &
+                    //"x_label='Layer';" &
+                    //"y_label='Carrier Density [nm^{-2}]';" &
+                    //"x_offset=1;" &
+                    //"path='"//trim(variation_path)//"'" &
+                    //""" basic_plot.p")
+            end do
             call execute_command_line("gnuplot -e """ &
                 //"data_file='"//potential_file//"';" &
                 //"output_file='potential';" &
                 //"data_column=1;" &
                 //"x_label='Layer';" &
-                //"y_label='Carrier Density [nm^{-2}]';" &
+                //"y_label='Potential [eV]';" &
                 //"x_offset=1;" &
                 //"path='"//trim(variation_path)//"'" &
                 //""" basic_plot.p")
@@ -242,7 +294,7 @@ program main
                     //"data_column=1;" &
                     //"x_label='"//x_label//"';" &
                     //"y_label='Carrier Density [nm^{-2}]';" &
-                    //"x_offset=1;" &
+                    //"x_offset="//export_to_string(x_offset)//";" &
                     //"path='"//trim(path)//"'" &
                     //""" basic_plot.p")
                 call execute_command_line("gnuplot -e """ &
@@ -251,7 +303,7 @@ program main
                     //"data_column=2;" &
                     //"x_label='"//x_label//"';" &
                     //"y_label='Carrier Density [nm^{-2}]';" &
-                    //"x_offset=1;" &
+                    //"x_offset="//export_to_string(x_offset)//";" &
                     //"path='"//trim(path)//"'" &
                     //""" basic_plot.p")
                 call execute_command_line("gnuplot -e """ &
@@ -260,7 +312,7 @@ program main
                     //"data_column=3;" &
                     //"x_label='"//x_label//"';" &
                     //"y_label='Carrier Density [nm^{-2}]';" &
-                    //"x_offset=1;" &
+                    //"x_offset="//export_to_string(x_offset)//";" &
                     //"path='"//trim(path)//"'" &
                     //""" basic_plot.p")
                 call execute_command_line("gnuplot -e """ &
@@ -269,7 +321,43 @@ program main
                     //"data_column=4;" &
                     //"x_label='"//x_label//"';" &
                     //"y_label='Carrier Density [nm^{-2}]';" &
-                    //"x_offset=1;" &
+                    //"x_offset="//export_to_string(x_offset)//";" &
+                    //"path='"//trim(path)//"'" &
+                    //""" basic_plot.p")
+                call execute_command_line("gnuplot -e """ &
+                    //"data_file='"//all_denity_file//"';" &
+                    //"output_file='Average_Total_Density';" &
+                    //"data_column=5;" &
+                    //"x_label='"//x_label//"';" &
+                    //"y_label='Carrier Density [nm^{-2}]';" &
+                    //"x_offset="//export_to_string(x_offset)//";" &
+                    //"path='"//trim(path)//"'" &
+                    //""" basic_plot.p")
+                call execute_command_line("gnuplot -e """ &
+                    //"data_file='"//all_denity_file//"';" &
+                    //"output_file='Average_reservoir_density';" &
+                    //"data_column=6;" &
+                    //"x_label='"//x_label//"';" &
+                    //"y_label='Carrier Density [nm^{-2}]';" &
+                    //"x_offset="//export_to_string(x_offset)//";" &
+                    //"path='"//trim(path)//"'" &
+                    //""" basic_plot.p")
+                call execute_command_line("gnuplot -e """ &
+                    //"data_file='"//all_denity_file//"';" &
+                    //"output_file='Average_transport_density';" &
+                    //"data_column=7;" &
+                    //"x_label='"//x_label//"';" &
+                    //"y_label='Carrier Density [nm^{-2}]';" &
+                    //"x_offset="//export_to_string(x_offset)//";" &
+                    //"path='"//trim(path)//"'" &
+                    //""" basic_plot.p")
+                call execute_command_line("gnuplot -e """ &
+                    //"data_file='"//all_denity_file//"';" &
+                    //"output_file='Average_reservoir_plus_transport_density';" &
+                    //"data_column=8;" &
+                    //"x_label='"//x_label//"';" &
+                    //"y_label='Carrier Density [nm^{-2}]';" &
+                    //"x_offset="//export_to_string(x_offset)//";" &
                     //"path='"//trim(path)//"'" &
                     //""" basic_plot.p")
             end if

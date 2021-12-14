@@ -7,12 +7,12 @@ target = main.f90
 target_test = test.f90
 output = a.out
 
-.PHONEY : run debug clean test
+.PHONEY : debug clean test
 
 default :
 	$(compiler) $(compiler_flags) $(modules) $(target) -o $(output) $(libraries)
 	
-debug : run
+debug : default
 	mpirun -np 4 ./a.out
 	make clean
 	

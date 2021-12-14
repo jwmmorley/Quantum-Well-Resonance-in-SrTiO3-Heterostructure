@@ -17,7 +17,7 @@ set tics front
 
 set title "Band Structure"
 
-set cbrange [getValue(9, 1, meta_file):getValue(9, 2, meta_file)] 
+set cbrange [0:getValue(9, 2, meta_file)] 
 
 set xlabel "K [pi/a]"
 set xtics (sprintf("%3.2f", -1.00 * getValue(4, 3, meta_file)) 0, \

@@ -14,7 +14,7 @@ contains
     finish = max(start_ly, end_ly)
     potential = initial_depth
     if (finish /= start) then
-        do i = 1, finish - start + 1 
+        do i = 1, finish - start + 1
             potential(i) = potential(i) + (final_depth - initial_depth) * (i - 1) / (finish - start)
         end do
     end if
