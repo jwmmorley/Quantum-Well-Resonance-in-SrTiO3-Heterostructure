@@ -61,14 +61,14 @@ contains
     end subroutine import_tunneling_data
 
     subroutine import_data(file_name, hr, hrw, max_hopping, num_bands)
-        character(256), intent(in)               :: file_name
-        complex*16,     allocatable              :: t(:)
-        integer,        allocatable              :: rx(:), ry(:), rz(:), bi(:), bj(:), w(:)
-        integer                                  :: file_number, num_r, i, n
-        integer,        intent(out)              :: max_hopping, num_bands
-        integer,        intent(out), allocatable :: hrw(:, :, :)
-        complex*16,     intent(out), allocatable :: hr(:, :, :, :, :)
-        open(newunit = file_number, file = file_name)
+        character(*), intent(in)               :: file_name
+        complex*16,   allocatable              :: t(:)
+        integer,      allocatable              :: rx(:), ry(:), rz(:), bi(:), bj(:), w(:)
+        integer                                :: file_number, num_r, i, n
+        integer,      intent(out)              :: max_hopping, num_bands
+        integer,      intent(out), allocatable :: hrw(:, :, :)
+        complex*16,   intent(out), allocatable :: hr(:, :, :, :, :)
+        open(newunit = file_number, file = trim(file_name))
         call import_meta_data(file_number, num_r, num_bands)
         call import_weight_data(file_number, w, num_r)
         call import_tunneling_data(file_number, rx, ry, rz, bi, bj, t, max_hopping, num_r, num_bands)
