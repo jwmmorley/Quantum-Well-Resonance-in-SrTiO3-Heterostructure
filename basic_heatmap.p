@@ -1,23 +1,28 @@
-path = ARG1
 cd path
 set print "-"
-data_file = "heatmap.dat"
 meta_file = "meta.dat"
 
 getValue(row, col, filename) = system('awk ''{if (NR == '.row.') print $'.col.'}'' '.filename.'')
 num_bounds = system("awk 'NR==3{print NF}' ".meta_file)
-num_col = system("awk 'NR==1{print NF}' ".data_file)
-num_rows = system("awk 'END{ print NR }' ".data_file)
+num_col = system("awk 'NR==1{print NF}' ".data_file.".dat")
+num_rows = system("awk 'END{ print NR }' ".data_file.".dat")
 
-set terminal png size 1680,1050
-set output "heatmap.png"
-set palette rgbformulae 21, 22, 23
+set terminal png size 1680,1050;
+set output output_file.".png"
 set key off
 set tics front
+#set palette defined (0 'black', \
+#    ((getValue(9, 2, meta_file) * -1 / 4) - getValue(9, 1, meta_file)) 'black', \
+#    (0 - getValue(9, 1, meta_file)) 'blue', \
+#    ((getValue(9, 2, meta_file) * 1 / 4) - getValue(9, 1, meta_file)) 'red', \
+#    ((getValue(9, 2, meta_file) * 2 / 4) - getValue(9, 1, meta_file)) 'orange', \
+#    ((getValue(9, 2, meta_file) * 3 / 4) - getValue(9, 1, meta_file)) 'yellow', \
+#    (getValue(9, 2, meta_file) - getValue(9, 1, meta_file)) 'white')
+set palette rgbformulae 21, 22, 23
 
 set title "Band Structure"
 
-set cbrange [0:getValue(9, 2, meta_file)] 
+set cbrange [getValue(9, 1, meta_file):getValue(9, 2, meta_file)] 
 
 set xlabel "K [pi/a]"
 set xtics (sprintf("%3.2f", -1.00 * getValue(4, 3, meta_file)) 0, \
@@ -38,4 +43,4 @@ do for [y = 1 : num_y_tics] {
     set ytics add (sprintf("%3.2f", y * y_difference / num_y_tics) (y_zero + y * (num_rows - 1) / num_y_tics))
     set ytics add (sprintf("%3.2f", -1 * y * y_difference / num_y_tics) (y_zero - y * (num_rows - 1) / num_y_tics))
 }
-plot data_file matrix with image
+plot data_file.".dat" matrix with image
