@@ -3,8 +3,10 @@ module route
     use spglib_f08
     implicit none
         
-        private :: route_count_unique_integer, route_loc_integer
-        public  :: route_range_double, route_build
+    private :: route_count_unique_integer, route_loc_integer
+    public  :: route_range_double, route_build
+    
+    real*8, parameter, private :: pi = 3.141592653589793d0
 
 contains
     function route_range_double(start_val, end_val, num_points) result(array)
@@ -48,6 +50,7 @@ contains
         integer, intent(in) :: val
         integer             :: lo
         integer             :: i
+        lo = 0
         do i = 1, size(array)
             if (array(i) == val) then
                 lo = i
@@ -70,7 +73,7 @@ contains
         num_ir_grid = spg_get_ir_reciprocal_mesh(grid_point, map, &
                       (/ floor(dble(num_length) / length_scale), floor(dble(num_length) / length_scale), &
                       floor(dble(num_length) / length_scale) /), (/ 0, 0, 0 /), 1, &
-                      transpose(lattice), transpose(positions), atom_types, size(atom_types), 1D-5)
+                      lattice, positions, atom_types, size(atom_types), 1D-5)
         used_map_length = num_length
         allocate(used_map(used_map_length**2))
         used_map = -1
@@ -128,8 +131,8 @@ contains
             weight(used_map(i)) = weight(used_map(i)) + 1
         end do
         do i = 1, size(used_grid_point(1, :))
-            kxs(i) = dble(used_grid_point(1, i)) / dble(floor(dble(num_length) / length_scale))
-            kys(i) = dble(used_grid_point(2, i)) / dble(floor(dble(num_length) / length_scale))
+            kxs(i) = 2 * pi * dble(used_grid_point(1, i)) / dble(floor(dble(num_length) / length_scale))
+            kys(i) = 2 * pi * dble(used_grid_point(2, i)) / dble(floor(dble(num_length) / length_scale))
         end do
         allocate(k_path_map(2 * floor((used_map_length - 1) / 2d0) + 1))
         do i = 1, floor((used_map_length - 1) / 2d0)

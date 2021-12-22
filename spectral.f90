@@ -5,8 +5,7 @@ module spectral
 
 contains
     function spectral_function(values, weights, point, broadening) result(a)
-        real*8, intent(in) :: weights, values, point, broadening
-        integer            :: i           
+        real*8, intent(in) :: weights, values, point, broadening         
         real*8             :: a
         a = 0d0
         a = a - dimag(weights &

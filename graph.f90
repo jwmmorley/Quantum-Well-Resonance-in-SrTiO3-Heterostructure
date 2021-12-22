@@ -19,12 +19,13 @@ contains
             //""" basic_plot.p")
     end subroutine graph_basic_plot
     
-    subroutine graph_heatmap_plot(data_file, output_file, path)
-        character(*), intent(in) :: data_file, output_file, path
+    subroutine graph_heatmap_plot(data_file, output_file, meta_file, path)
+        character(*), intent(in) :: data_file, output_file, meta_file, path
         call execute_command_line("gnuplot -e """ &
             //"data_file='"//data_file//"';" &
             //"output_file='"//output_file//"';" &
-            //"path='"//trim(path)//"'" &
+            //"meta_file='"//meta_file//"';" &
+            //"path='"//path//"'" &
             //""" basic_heatmap.p")
     end subroutine graph_heatmap_plot
 

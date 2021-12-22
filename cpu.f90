@@ -2,11 +2,11 @@ module cpu
     use mpi
     implicit none
     
-    private :: cpu_sum_double, &
+    private :: cpu_sum_double,&
                cpu_broadcast_integer, cpu_broadcast_double, cpu_broadcast_double_complex
     public  :: cpu_start, cpu_stop, &
                cpu_get_id, cpu_get_num, cpu_get_master_id, cpu_is_master, &
-               cpu_broadcast, cpu_sum
+               cpu_broadcast, cpu_sum, cpu_split_work
     
     logical, private, save      :: cpu_started   = .false.
     integer, private, parameter :: cpu_master_id = 0
@@ -16,6 +16,7 @@ module cpu
     interface cpu_sum
         module procedure cpu_sum_double
     end interface cpu_sum
+    
     interface cpu_broadcast
         module procedure cpu_broadcast_integer, cpu_broadcast_double, cpu_broadcast_double_complex
     end interface cpu_broadcast
@@ -53,13 +54,21 @@ contains
         
     end subroutine cpu_split_work
         
-    subroutine cpu_sum_double(v_in, v_out)
+    subroutine cpu_sum_double(v_in, v_out, target_id)
         real*8, intent(in)  :: v_in(..)
         real*8, intent(out) :: v_out(..)
-        call MPI_ALLREDUCE(v_in, v_out, size(v_in), MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, cpu_error)
+        integer, optional   :: target_id
+        integer             :: id = cpu_master_id
+        if (.not. cpu_started) then
+            call cpu_start()
+        end if
+        if (present(target_id)) then
+            id = target_id
+        end if
+        call MPI_REDUCE(v_in, v_out, size(v_in), MPI_DOUBLE_PRECISION, MPI_SUM, id, MPI_COMM_WORLD, cpu_error)
     
     end subroutine cpu_sum_double
-        
+    
     subroutine cpu_broadcast_integer(v, length, target_id)
         integer, intent(in)    :: length
         integer, intent(inout) :: v(..)
@@ -77,7 +86,7 @@ contains
     
     subroutine cpu_broadcast_double(v, length, target_id)
         integer, intent(in)    :: length
-        real*16, intent(inout) :: v(..)
+        real*8,  intent(inout) :: v(..)
         integer, optional      :: target_id
         integer                :: id = cpu_master_id 
         if (.not. cpu_started) then

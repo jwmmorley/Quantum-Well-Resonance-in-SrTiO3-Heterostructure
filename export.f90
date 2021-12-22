@@ -17,24 +17,25 @@ module export
 
 
 contains
-    subroutine export_meta_data(path, num_k_length, num_layers, broadening, crystal_length, max_crystal_length, &
+    subroutine export_meta_data(path, num_k_length, num_layers, num_k_path, num_energy, &
+        broadening, crystal_length, max_crystal_length, &
         min_potential, max_potential, min_density, max_density, energy_min, energy_max, min_heatmap, max_heatmap)
         character(*), intent(in) :: path
-        integer,      intent(in) :: num_k_length, num_layers
+        integer,      intent(in) :: num_k_length, num_layers, num_k_path, num_energy
         real*8,       intent(in) :: broadening, crystal_length, max_crystal_length
         real*8,       intent(in) :: min_potential, max_potential, min_density, max_density, &
                                     energy_min, energy_max, min_heatmap, max_heatmap
         integer                  :: file_number
         open(newunit = file_number, file = trim(path), status = "new", action = "write")
-        write(file_number, fmt = "(2A16)")      "# Num K Len"  , "Num Layers"
-        write(file_number, fmt = "(2I16.1)")    num_k_length   , num_layers
-        write(file_number, fmt = "(3A16)")      "# Broadening" , "Crystal Len (a)", "K Len [2pi*a]"
-        write(file_number, fmt = "(3F16.8)")    broadening     , crystal_length   , max_crystal_length
-        write(file_number, fmt = "(2A16)")      "# Min"        , "Max"
-        write(file_number, fmt = "(2F16.8, A)") min_potential  , max_potential    , " # Potential"
-        write(file_number, fmt = "(2F16.8, A)") min_density    , max_density      , " # Density"
-        write(file_number, fmt = "(2F16.8, A)") energy_min     , energy_max       , " # Heatmap y"
-        write(file_number, fmt = "(2F16.8, A)") min_heatmap    , max_heatmap      , " # Heatmap c"
+        write(file_number, fmt = "(4A16)")      "# Num K Len" , "Num Layers"     , "Num Path K"      , "Num Path Energy"
+        write(file_number, fmt = "(4I16.1)")    num_k_length  , num_layers       , num_k_path        , num_energy
+        write(file_number, fmt = "(3A16)")      "# Broadening", "Crystal Len (a)", "K Len [2pi*a]"
+        write(file_number, fmt = "(3F16.8)")    broadening    , crystal_length   , max_crystal_length
+        write(file_number, fmt = "(2A16)")      "# Min"       , "Max"
+        write(file_number, fmt = "(2F16.8, A)") min_potential , max_potential    , " # Potential"
+        write(file_number, fmt = "(2F16.8, A)") min_density   , max_density      , " # Density"
+        write(file_number, fmt = "(2F16.8, A)") energy_min    , energy_max       , " # Heatmap y"
+        write(file_number, fmt = "(2F16.8, A)") min_heatmap   , max_heatmap      , " # Heatmap c"
         close(file_number)
     
     end subroutine export_meta_data
@@ -144,19 +145,26 @@ contains
     
     end subroutine export_open_append
     
-    function export_create_dir(path) result(dir)
+    function export_create_dir(path, prefix) result(dir)
         character(*), intent(in)  :: path
+        character(*), intent(in)  :: prefix
         integer                   :: file_label
         logical                   :: directory_exists
         character(:), allocatable :: dir
-        file_label       = 0
-        directory_exists = .true.
-        do while (directory_exists)
-            file_label = file_label + 1
-            inquire(file = trim(path)//export_to_string(file_label)//"/.", exist = directory_exists)
-        end do 
-        dir = trim(path)//export_to_string(file_label)//"/"
-        call execute_command_line("mkdir -p "//dir)
+        inquire(file = path//prefix//"/.", exist = directory_exists)
+        if (.not. directory_exists) then
+            dir = path//prefix//"/"
+            call execute_command_line("mkdir -p """//dir//"""")
+        else
+            file_label       = 0
+            do while (directory_exists)
+                file_label = file_label + 1
+                inquire(file = path//prefix//export_to_string(file_label)//"/.", exist = directory_exists)
+            end do 
+            dir = path//prefix//export_to_string(file_label)//"/"
+            call execute_command_line("mkdir -p """//dir//"""")
+        end if
+        
     
     end function export_create_dir
     
