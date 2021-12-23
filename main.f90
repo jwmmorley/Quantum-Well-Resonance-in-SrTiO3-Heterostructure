@@ -14,7 +14,7 @@ program main
     implicit none
     
     integer,        parameter   :: num_variation      = 1
-    integer,        parameter   :: num_layers         = 99
+    integer,        parameter   :: num_layers         = 40
     
     integer                     :: well_1_start       = 1!30
     integer                     :: well_1_stop        = 10!66
@@ -26,8 +26,8 @@ program main
     real*8                      :: well_2_start_depth = 0d0!-0.28d0!-0.03d0 
     real*8                      :: well_2_stop_depth  = 0d0!-0.2d0!0d0!-0.03d0
     
-    integer,        parameter   :: num_k_length       = 256
-    integer,        parameter   :: num_energy         = 256
+    integer,        parameter   :: num_k_length       = 128
+    integer,        parameter   :: num_energy         = 128
     integer,        parameter   :: output_bands(3)    = (/ 1, 2, 3 /)
     integer,        parameter   :: output_states(*)   = (/ 1, 2, 3 /)
     real*8,         parameter   :: energy_min         = -0.3d0
