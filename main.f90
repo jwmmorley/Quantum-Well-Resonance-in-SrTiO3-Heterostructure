@@ -13,33 +13,36 @@ program main
     use graph
     implicit none
     
-    integer,        parameter   :: num_variation      = 1
-    integer,        parameter   :: num_layers         = 40
+    integer,        parameter   :: num_variation      = 36
+    integer,        parameter   :: num_layers         = 60
     
     integer                     :: well_1_start       = 1!30
-    integer                     :: well_1_stop        = 10!66
-    real*8                      :: well_1_start_depth = -0.22d0!-0.22d0
+    integer                     :: well_1_stop        = 7!66
+    real*8                      :: well_1_start_depth = -0.1d0!-0.22d0
     real*8                      :: well_1_stop_depth  = 0d0!-0.22d0
     
-    integer                     :: well_2_start       = 1!18!66
-    integer                     :: well_2_stop        = 1!21!66 + 4
-    real*8                      :: well_2_start_depth = 0d0!-0.28d0!-0.03d0 
-    real*8                      :: well_2_stop_depth  = 0d0!-0.2d0!0d0!-0.03d0
+    integer                     :: well_2_start       = 10!18!66
+    integer                     :: well_2_stop        = 12!21!66 + 4
+    real*8                      :: well_2_start_depth = -0.28d0!-0.28d0!-0.03d0 
+    real*8                      :: well_2_stop_depth  = -0.28d0!-0.2d0!0d0!-0.03d0
     
-    integer,        parameter   :: num_k_length       = 128
-    integer,        parameter   :: num_energy         = 128
+    integer,        parameter   :: num_k_length       = 256
+    integer,        parameter   :: num_energy         = 256
     integer,        parameter   :: output_bands(3)    = (/ 1, 2, 3 /)
     integer,        parameter   :: output_states(*)   = (/ 1, 2, 3 /)
-    real*8,         parameter   :: energy_min         = -0.3d0
-    real*8,         parameter   :: energy_max         = -0.1d0
-    real*8,         parameter   :: length_scale       = 0.5d0
+    real*8                      :: energy_min         = -1.3d0
+    real*8                      :: energy_max         = 0d0
+    real*8,         parameter   :: length_scale       = 1d0
     real*8,         parameter   :: broadening         = 0.0025d0
     
     real*8,         parameter   :: kcbmx              = 0d0
     real*8,         parameter   :: kcbmy              = 0d0
     
     integer                     :: x_offset           = 0
-    character(*),   parameter   :: x_label            = "Reservoir and Transport Seperation"
+    character(*),   parameter   :: x_label            = "Surface Layer Doping [-0.1eV]"
+    
+    logical,        parameter   :: auto_energy_min    = .true.
+    logical,        parameter   :: auto_energy_max    = .false.
     
     character(*),   parameter   :: input_file         = "SrTiO3_hr.dat"
     character(*),   parameter   :: out_dir            = "./out/"
@@ -77,7 +80,7 @@ program main
     real*8                      :: cbm
     
     real*8,         allocatable :: spec(:, :, :)
-    real*8                      :: energy_range(num_energy)
+    real*8                      :: energy_range(num_variation, num_energy)
     
     real*8,         allocatable :: heatmap_bands_cpu(:, :, :), heatmap_states_cpu(:, :, :), heatmap_total_cpu(:, :), &
                                    heatmap_bands(:, :, :), heatmap_states(:, :, :), heatmap_total(:, :)
@@ -99,8 +102,7 @@ program main
     do i = 1, num_variation
         ! Manipulate Wells
         ! -------------------------------------------------------------------------------------------------------------------------
-        !well_2_start = well_2_start + 1
-        !well_2_stop  = well_2_start + 2
+        well_1_start_depth = (i - 1) * -0.1d0
         ! -------------------------------------------------------------------------------------------------------------------------
         
         ! Set Up Potential
@@ -155,10 +157,38 @@ program main
     do i = 1, num_variation
         hb = bulk_build(transform_r_to_kz(hr, hrw, kcbmx, kcbmy), num_layers)
         call bulk_add_potential(hb, pot(i, :))
-        energy = 0d0
-        weight = dcmplx(0d0, 0d0)
+        if (auto_energy_min) then
+            energy = 0d0
+            weight = dcmplx(0d0, 0d0)
+            call matrix_get_eigen(hb, energy, weight, num_found, 1, 1)
+            energy_min = (energy(1) - cbm) - sqrt((broadening / 10d0) - broadening**2) - sqrt(broadening - broadening**2)
+        end if
+        if (auto_energy_max) then
+            energy = 0d0
+            weight = dcmplx(0d0, 0d0)
+            call matrix_get_eigen(hb, energy, weight, num_found, (num_states - 1), num_states)
+            energy_max = (energy(1) - cbm) + sqrt((broadening / 10d0) - broadening**2) - sqrt(broadening - broadening**2)
+        end if
+        if (energy_min == energy_max) then
+            if (auto_energy_min .and. .not. auto_energy_max) then
+                energy_min = energy_min - sqrt((broadening / 10d0) - broadening**2) - sqrt(broadening - broadening**2)
+            else if (.not. auto_energy_min .and. auto_energy_max) then
+                energy_max = energy_max + sqrt((broadening / 10d0) - broadening**2) - sqrt(broadening - broadening**2)
+            else
+                energy_min = energy_min - sqrt((broadening / 10d0) - broadening**2) - sqrt(broadening - broadening**2)
+                energy_max = energy_max + sqrt((broadening / 10d0) - broadening**2) - sqrt(broadening - broadening**2)
+            end if
+        end if
+        energy    = 0d0
+        weight    = dcmplx(0d0, 0d0)
+        num_found = 0
         call matrix_get_eigen(hb, energy, weight, num_found, energy_min + cbm, energy_max + cbm)
         max_num_states(i) = num_found
+        if (max_num_states(i) == 0) then
+            max_num_states(i) = 1
+        end if
+        ! Set Up Energy Range
+        energy_range(i, :) = route_range_double(energy_min, energy_max, num_energy)
     end do
     
     ! Allocate Dynamic Arrays
@@ -177,9 +207,6 @@ program main
         allocate(heatmap_states(size(kp), size(output_states), num_energy))
         allocate(heatmap_total(size(kp), num_energy))
     end if
-    
-    ! Set Up Energy Range
-    energy_range = route_range_double(energy_min, energy_max, num_energy)
     
     ! Set up Output Folder
     if (cpu_is_master()) then
@@ -241,7 +268,7 @@ program main
                         do m = 1, num_found
                             do e = 1, num_energy
                                 spec(j, m, e) = spectral_function( &
-                                    energy(m), dble(abs(weight((l - 1) * num_bands + j, m))**2), energy_range(e), broadening)
+                                    energy(m), dble(abs(weight((l - 1) * num_bands + j, m))**2), energy_range(i, e), broadening)
                             end do
                         end do
                     end do
@@ -259,7 +286,7 @@ program main
                         do m = 1, num_found
                             do e = 1, num_energy
                                 spec(j, m, e) = spectral_function( &
-                                    energy(m), dble(abs(weight((l - 1) * num_bands + j, m))**2), energy_range(e), broadening)
+                                    energy(m), dble(abs(weight((l - 1) * num_bands + j, m))**2), energy_range(i, e), broadening)
                             end do
                         end do
                     end do
@@ -294,17 +321,17 @@ program main
             end if
         end do
         den_bands_cpu  = den_bands_cpu * (1d0 / pi) &
-                          * ((energy_max - energy_min) / dble(num_energy)) &
+                          * ((energy_range(i, 2) - energy_range(i, 1)) / dble(num_energy)) &
                           * (1d0 / crystal_length**2) &
                           * (1d0 / dble(sum(kw))) &
                           * (1d-18)
         den_states_cpu = den_states_cpu * (1d0 / pi) &
-                          * ((energy_max - energy_min) / dble(num_energy)) &
+                          * ((energy_range(i, 2) - energy_range(i, 1)) / dble(num_energy)) &
                           * (1d0 / crystal_length**2) &
                           * (1d0 / dble(sum(kw))) &
                           * (1d-18)
         den_total_cpu  = den_total_cpu * (1d0 / pi) &
-                          * ((energy_max - energy_min) / dble(num_energy)) &
+                          * ((energy_range(i, 2) - energy_range(i, 1)) / dble(num_energy)) &
                           * (1d0 / crystal_length**2) &
                           * (1d0 / dble(sum(kw))) &
                           * (1d-18)
@@ -323,7 +350,7 @@ program main
                 num_k_length, num_layers, size(kp), num_energy, &
                 broadening, crystal_length, length_scale, &
                 minval(pot(i, :)), maxval(pot(i, :)), minval(den_total), maxval(den_total), &
-                energy_min, energy_max, minval(log(heatmap_total)), maxval(log(heatmap_total)))
+                minval(energy_range(i, :)), maxval(energy_range(i, :)), minval(log(heatmap_total)), maxval(log(heatmap_total)))
                 
             ! Export and Plot Variation Data
             call export_data(trim(variation_dir)//"potential.dat",      pot(i, :))

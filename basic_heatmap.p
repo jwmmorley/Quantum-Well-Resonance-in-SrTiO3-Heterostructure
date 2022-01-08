@@ -37,20 +37,22 @@ y_min = getValue(8, 1, meta_file.".dat") + 0; # + 0 Converts from string to numb
 y_max = getValue(8, 2, meta_file.".dat") + 0;
 y_difference = y_max - y_min;
 set format y "%4.3f"
-if (y_max < 0) { \
-    set ytics (sprintf("%4.3f", y_max) (num_row - 1));
+y_zero = (num_col - 1) * (-1 * y_min) / y_difference; 
+y_zero_value = 0;
+if (y_max <= 0) { \
     y_zero = num_row;
     y_zero_value = y_max;
+    set ytics (sprintf("%4.3f", y_max) (num_row - 1));
 };
-if (0 < y_min){ \
-    set ytics (sprintf("%4.3f", y_min) 0);
+if (0 <= y_min){ \
     y_zero = 0;
     y_zero_value = y_min;
+    set ytics (sprintf("%4.3f", y_min) 0);
 };
 if (y_min < 0 && 0 < y_max) { \
-    set ytics ("0" y_zero);
     y_zero = (num_col - 1) * (-1 * y_min) / y_difference; 
     y_zero_value = 0;
+    set ytics ("0" y_zero);
 };
 do for [y = 1 : num_y_tics] {
     set ytics add (sprintf("%4.3f", y_zero_value + y * (y_difference + y_zero_value) / num_y_tics) \
