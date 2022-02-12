@@ -13,27 +13,27 @@ program main
     use graph
     implicit none
     
-    integer,        parameter   :: num_variation      = 36
-    integer,        parameter   :: num_layers         = 60
+    integer,        parameter   :: num_variation      = 1
+    integer,        parameter   :: num_layers         = 100
     
-    integer                     :: well_1_start       = 1!30
-    integer                     :: well_1_stop        = 7!66
-    real*8                      :: well_1_start_depth = -0.1d0!-0.22d0
-    real*8                      :: well_1_stop_depth  = 0d0!-0.22d0
+    integer                     :: well_1_start       = 38!30
+    integer                     :: well_1_stop        = 63!66
+    real*8                      :: well_1_start_depth = -0.003d0!-0.22d0
+    real*8                      :: well_1_stop_depth  = -0.003d0!0d0!-0.22d0
     
-    integer                     :: well_2_start       = 10!18!66
-    integer                     :: well_2_stop        = 12!21!66 + 4
-    real*8                      :: well_2_start_depth = -0.28d0!-0.28d0!-0.03d0 
-    real*8                      :: well_2_stop_depth  = -0.28d0!-0.2d0!0d0!-0.03d0
+    integer                     :: well_2_start       = 1!18!66
+    integer                     :: well_2_stop        = 1!21!66 + 4
+    real*8                      :: well_2_start_depth = 0.0d0!-0.28d0!-0.03d0 
+    real*8                      :: well_2_stop_depth  = 0.0d0!-0.2d0!0d0!-0.03d0
     
     integer,        parameter   :: num_k_length       = 256
     integer,        parameter   :: num_energy         = 256
     integer,        parameter   :: output_bands(3)    = (/ 1, 2, 3 /)
     integer,        parameter   :: output_states(*)   = (/ 1, 2, 3 /)
-    real*8                      :: energy_min         = -1.3d0
-    real*8                      :: energy_max         = 0d0
-    real*8,         parameter   :: length_scale       = 1d0
-    real*8,         parameter   :: broadening         = 0.0025d0
+    real*8                      :: energy_min         = -0.003d0
+    real*8                      :: energy_max         = 0d0!2.5d0
+    real*8,         parameter   :: length_scale       = 0.04d0
+    real*8,         parameter   :: broadening         = 0.00005d0
     
     real*8,         parameter   :: kcbmx              = 0d0
     real*8,         parameter   :: kcbmy              = 0d0
@@ -41,7 +41,7 @@ program main
     integer                     :: x_offset           = 0
     character(*),   parameter   :: x_label            = "Surface Layer Doping [-0.1eV]"
     
-    logical,        parameter   :: auto_energy_min    = .true.
+    logical,        parameter   :: auto_energy_min    = .false.
     logical,        parameter   :: auto_energy_max    = .false.
     
     character(*),   parameter   :: input_file         = "SrTiO3_hr.dat"
@@ -102,7 +102,7 @@ program main
     do i = 1, num_variation
         ! Manipulate Wells
         ! -------------------------------------------------------------------------------------------------------------------------
-        well_1_start_depth = (i - 1) * -0.1d0
+        !well_1_stop = i
         ! -------------------------------------------------------------------------------------------------------------------------
         
         ! Set Up Potential

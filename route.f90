@@ -66,40 +66,42 @@ contains
         real*8,  intent(out), allocatable :: kxs(:), kys(:)
         integer, intent(out), allocatable :: weight(:)
         integer, intent(out), allocatable :: k_path_map(:)
-        integer                           :: map(floor(dble(num_length) / length_scale)**3), &
-                                             grid_point(3, floor(dble(num_length) / length_scale)**3), & 
-                                             num_ir_grid, i, j, n, used_map_length
+        real*8                            :: positions_2d(size(positions(:, 1)), size(positions(1, :)))
+        integer                           :: map(floor(dble(num_length) / length_scale)**2), &
+                                             grid_point(3, floor(dble(num_length) / length_scale)**2), & 
+                                             num_ir_grid, i, j, n
         integer, allocatable              :: used_map_to_map(:), used_grid_point(:, :), used_map(:)
+        positions_2d = positions
+        positions_2d(3, :) = 0d0
         num_ir_grid = spg_get_ir_reciprocal_mesh(grid_point, map, &
-                      (/ floor(dble(num_length) / length_scale), floor(dble(num_length) / length_scale), &
-                      floor(dble(num_length) / length_scale) /), (/ 0, 0, 0 /), 1, &
-                      lattice, positions, atom_types, size(atom_types), 1D-5)
-        used_map_length = num_length
-        allocate(used_map(used_map_length**2))
+                      (/ floor(dble(num_length) / length_scale), floor(dble(num_length) / length_scale), 1 /), &
+                      (/ 0, 0, 0 /), 1, &
+                      lattice, positions_2d, atom_types, size(atom_types), 1D-5)
+        allocate(used_map(num_length**2))
         used_map = -1
-        do i = 1, used_map_length
-            do j = 1, used_map_length
-                if (i <= used_map_length / 2 .and. j >= used_map_length / 2 + mod(used_map_length, 2)) then
-                    used_map((i - 1) * used_map_length + j) = map(&
-                        ((i + floor(dble(num_length) / length_scale) - used_map_length / 2) - 1) &
+        do i = 1, num_length
+            do j = 1, num_length
+                if (i <= num_length / 2 .and. j >= num_length / 2 + mod(num_length, 2)) then
+                    used_map((i - 1) * num_length + j) = map(&
+                        ((i + floor(dble(num_length) / length_scale) - num_length / 2) - 1) &
                             * floor(dble(num_length / length_scale)) &
-                        + (j - used_map_length / 2 - mod(used_map_length, 2))) + 1
+                        + (j - num_length / 2 - mod(num_length, 2))) + 1
                 end if
-                if (i >= used_map_length / 2 + mod(used_map_length, 2) .and. j <= used_map_length / 2) then
-                    used_map((i - 1) * used_map_length + j) = map(&
-                        ((i - used_map_length / 2) - mod(used_map_length, 2)) &
+                if (i >= num_length / 2 + mod(num_length, 2) .and. j <= num_length / 2) then
+                    used_map((i - 1) * num_length + j) = map(&
+                        ((i - num_length / 2) - mod(num_length, 2)) &
                             * floor(dble(num_length / length_scale)) &
-                        + (j + floor(dble(num_length) / length_scale) - used_map_length / 2)) + 1
+                        + (j + floor(dble(num_length) / length_scale) - num_length / 2)) + 1
                 end if
-                if (i <= used_map_length / 2 .and. j <= used_map_length / 2) then
-                    used_map((i - 1) * used_map_length + j) = map(&
-                        ((i + floor(dble(num_length) / length_scale) - used_map_length / 2) - 1) &
+                if (i <= num_length / 2 .and. j <= num_length / 2) then
+                    used_map((i - 1) * num_length + j) = map(&
+                        ((i + floor(dble(num_length) / length_scale) - num_length / 2) - 1) &
                             * floor(dble(num_length / length_scale)) &
-                        + (j + floor(dble(num_length) / length_scale) - used_map_length / 2)) + 1
+                        + (j + floor(dble(num_length) / length_scale) - num_length / 2)) + 1
                 end if
-                if (i > used_map_length / 2 .and. j > used_map_length / 2) then
-                    used_map((i - 1) * used_map_length + j) = map(&
-                        ((i - used_map_length / 2) - 1) * floor(dble(num_length / length_scale)) + (j - used_map_length / 2)) + 1
+                if (i > num_length / 2 .and. j > num_length / 2) then
+                    used_map((i - 1) * num_length + j) = map(&
+                        ((i - num_length / 2) - 1) * floor(dble(num_length / length_scale)) + (j - num_length / 2)) + 1
                 end if
             end do
         end do
@@ -134,18 +136,18 @@ contains
             kxs(i) = 2 * pi * dble(used_grid_point(1, i)) / dble(floor(dble(num_length) / length_scale))
             kys(i) = 2 * pi * dble(used_grid_point(2, i)) / dble(floor(dble(num_length) / length_scale))
         end do
-        allocate(k_path_map(2 * floor((used_map_length - 1) / 2d0) + 1))
-        do i = 1, floor((used_map_length - 1) / 2d0)
-            k_path_map(i) = used_map((used_map_length - i) * used_map_length + used_map_length - i + 1)
+        allocate(k_path_map(2 * floor((num_length - 1) / 2d0) + 1))
+        do i = 1, floor((num_length - 1) / 2d0)
+            k_path_map(i) = used_map((num_length - i) * num_length + num_length - i + 1)
         end do
-        do i = floor((used_map_length - 1) / 2d0) + 2, size(k_path_map)
+        do i = floor((num_length - 1) / 2d0) + 2, size(k_path_map)
             k_path_map(i) = used_map(&
-                (i + mod(used_map_length, floor((used_map_length - 1) / 2d0)) - 2) * used_map_length &
-                + used_map_length - floor((used_map_length - 1) / 2d0))
+                (i + mod(num_length, floor((num_length - 1) / 2d0)) - 2) * num_length &
+                + num_length - floor((num_length - 1) / 2d0))
         end do
-        k_path_map(floor((used_map_length - 1) / 2d0) + 1) = used_map(&
-            (used_map_length - floor((used_map_length - 1) / 2d0) - 1) * used_map_length &
-            + used_map_length - floor((used_map_length - 1) / 2d0))
+        k_path_map(floor((num_length - 1) / 2d0) + 1) = used_map(&
+            (num_length - floor((num_length - 1) / 2d0) - 1) * num_length &
+            + num_length - floor((num_length - 1) / 2d0))
         
     end subroutine route_build
 
